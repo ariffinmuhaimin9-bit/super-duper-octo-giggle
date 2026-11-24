@@ -1,0 +1,6 @@
+{
+  "name": "MiniVerse Hub",
+  "description": "Hab permainan ceria & multiplayer dengan 134+ minigame 3D & 2D.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 30 &&
+             data.avatarEmoji is string && data.avatarEmoji.size() >= 1 && data.avatarEmoji.size() <= 16 &&
+             data.avatarColorHex is string && data.avatarColorHex.size() >= 4 && data.avatarColorHex.size() <= 12 &&
+             data.bio is string && data.bio.size() <= 140 &&
+             data.favoriteBadge is string && data.favoriteBadge.size() <= 40 &&
+             data.totalScore is int && data.totalScore >= 0 &&
+             data.gamesPlayed is int && data.gamesPlayed >= 0 &&
+             data.favoriteGameIds is list && data.favoriteGameIds.size() <= 150 &&
+             (data.favoriteGameIds.size() == 0 || data.favoriteGameIds[0] is string);
+    }
+
+    function isValidGameRoom(data) {
+      return data.roomCode is string && data.roomCode.size() == 4 && data.roomCode.matches('^[0-9]{4}$') &&
+             data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
+             data.hostName is string && data.hostName.size() >= 1 && data.hostName.size() <= 30 &&
+             data.hostAvatar is string && data.hostAvatar.size() >= 1 && data.hostAvatar.size() <= 16 &&
+             (!('guestUid' in data) || data.guestUid == null || (data.guestUid is string && data.guestUid.size() >= 1 && data.guestUid.size() <= 128)) &&
+             (!('guestName' in data) || data.guestName == null || (data.guestName is string && data.guestName.size() >= 1 && data.guestName.size() <= 30)) &&
+             (!('guestAvatar' in data) || data.guestAvatar == null || (data.guestAvatar is string && data.guestAvatar.size() >= 1 && data.guestAvatar.size() <= 16)) &&
+             data.guestReady is bool &&
+             data.gameId is string && data.gameId.size() >= 1 && data.gameId.size() <= 60 &&
+             data.status in ['waiting', 'playing', 'finished'] &&
+             data.lastEmote is string && data.lastEmote.size() <= 60 &&
+             data.lastEmoteSender is string && data.lastEmoteSender.size() <= 30;
+    }
+
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'avatarEmoji', 'avatarColorHex', 'bio', 'favoriteBadge', 'totalScore', 'gamesPlayed', 'favoriteGameIds', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'avatarEmoji', 'avatarColorHex', 'bio', 'favoriteBadge', 'totalScore', 'gamesPlayed', 'favoriteGameIds', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatarEmoji', 'avatarColorHex', 'bio', 'favoriteBadge', 'totalScore', 'gamesPlayed', 'favoriteGameIds', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    match /rooms/{roomId} {
+      allow get: if isSignedIn() && isValidId(roomId);
+
+      allow list: if isSignedIn() &&
+                     (resource.data.hostUid == request.auth.uid || resource.data.guestUid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(roomId) &&
+                       incoming().hostUid == request.auth.uid &&
+                       incoming().status == 'waiting' &&
+                       incoming().guestReady == false &&
+                       !('guestUid' in incoming()) &&
+                       incoming().keys().hasAll(['roomCode', 'hostUid', 'hostName', 'hostAvatar', 'guestReady', 'gameId', 'status', 'lastEmote', 'lastEmoteSender', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['roomCode', 'hostUid', 'hostName', 'hostAvatar', 'guestUid', 'guestName', 'guestAvatar', 'guestReady', 'gameId', 'status', 'lastEmote', 'lastEmoteSender', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidGameRoom(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(roomId) &&
+                       isValidGameRoom(incoming()) &&
+                       incoming().hostUid == existing().hostUid &&
+                       incoming().roomCode == existing().roomCode &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       (
+                         // Action 1: Join room as guest
+                         (
+                           existing().status == 'waiting' &&
+                           (!('guestUid' in existing()) || existing().guestUid == null) &&
+                           incoming().guestUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['guestUid', 'guestName', 'guestAvatar', 'guestReady', 'updatedAt'])
+                         ) ||
+                         // Action 2: Joined guest toggles ready state
+                         (
+                           existing().status == 'waiting' &&
+                           ('guestUid' in existing()) &&
+                           existing().guestUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['guestReady', 'updatedAt'])
+                         ) ||
+                         // Action 3: Room participant sends safe quick emote
+                         (
+                           existing().status != 'finished' &&
+                           (existing().hostUid == request.auth.uid || (('guestUid' in existing()) && existing().guestUid == request.auth.uid)) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['lastEmote', 'lastEmoteSender', 'updatedAt'])
+                         ) ||
+                         // Action 4: Host updates game, starts, finishes, or resets for rematch
+                         (
+                           existing().hostUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['gameId', 'status', 'guestReady', 'updatedAt']) &&
+                           (existing().status != 'finished' || incoming().status == 'waiting')
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(roomId) && existing().hostUid == request.auth.uid;
+    }
+  }
+}

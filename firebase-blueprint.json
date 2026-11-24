@@ -1,0 +1,159 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Custom player profile with avatar, bio, badge, favorites, and cumulative MiniVerse Hub stats.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID matching document ID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Player custom display nickname (1-30 chars)."
+        },
+        "avatarEmoji": {
+          "type": "string",
+          "description": "Selected mascot emoji avatar."
+        },
+        "avatarColorHex": {
+          "type": "string",
+          "description": "Hex accent color for avatar frame."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short player tagline or bio (0-140 chars)."
+        },
+        "favoriteBadge": {
+          "type": "string",
+          "description": "Selected player badge title."
+        },
+        "totalScore": {
+          "type": "integer",
+          "description": "Cumulative MiniVerse Hub score."
+        },
+        "gamesPlayed": {
+          "type": "integer",
+          "description": "Total games played."
+        },
+        "favoriteGameIds": {
+          "type": "array",
+          "description": "List of favorited game IDs."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on last update."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "avatarEmoji",
+        "avatarColorHex",
+        "bio",
+        "favoriteBadge",
+        "totalScore",
+        "gamesPlayed",
+        "favoriteGameIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GameRoom": {
+      "title": "GameRoom",
+      "description": "4-digit WiFi / Friend Lobby room for MiniVerse Hub.",
+      "type": "object",
+      "properties": {
+        "roomCode": {
+          "type": "string",
+          "description": "4-digit room code."
+        },
+        "hostUid": {
+          "type": "string",
+          "description": "UID of the room host."
+        },
+        "hostName": {
+          "type": "string",
+          "description": "Display name of the host."
+        },
+        "hostAvatar": {
+          "type": "string",
+          "description": "Avatar emoji of the host."
+        },
+        "guestUid": {
+          "type": "string",
+          "description": "Optional UID of joined guest player."
+        },
+        "guestName": {
+          "type": "string",
+          "description": "Optional display name of joined guest."
+        },
+        "guestAvatar": {
+          "type": "string",
+          "description": "Optional avatar emoji of joined guest."
+        },
+        "guestReady": {
+          "type": "boolean",
+          "description": "Guest readiness flag."
+        },
+        "gameId": {
+          "type": "string",
+          "description": "Selected game ID."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["waiting", "playing", "finished"],
+          "description": "Current room status."
+        },
+        "lastEmote": {
+          "type": "string",
+          "description": "Safe quick emote message."
+        },
+        "lastEmoteSender": {
+          "type": "string",
+          "description": "Display name of quick emote sender."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on last update."
+        }
+      },
+      "required": [
+        "roomCode",
+        "hostUid",
+        "hostName",
+        "hostAvatar",
+        "guestReady",
+        "gameId",
+        "status",
+        "lastEmote",
+        "lastEmoteSender",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only custom player profiles."
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/GameRoom" },
+      "description": "4-digit friend lobby rooms."
+    }
+  }
+}
